@@ -4,7 +4,50 @@ import os
 import requests
 from PIL import Image, ImageOps
 from io import BytesIO
+import time
+import shutil
 
+# Function to delete files after 5 minutes of inactivity
+def cleanup_images():
+    image_folder = 'images'
+    if os.path.exists(image_folder):
+        # Get the current time
+        current_time = time.time()
+        # Check if the images folder exists and its modification time
+        folder_mod_time = os.path.getmtime(image_folder)
+
+        # If the folder hasn't been modified in 5 minutes (300 seconds), delete its contents
+        if current_time - folder_mod_time > 300:  # 300 seconds = 5 minutes
+            shutil.rmtree(image_folder)
+            os.makedirs(image_folder, exist_ok=True)
+            st.write("Old images and GIFs purged due to inactivity.")
+
+# Function to track user activity and reset timer
+def track_user_activity():
+    st.session_state.last_activity_time = time.time()
+
+# Call this function whenever there's any interaction to reset the inactivity timer
+if "last_activity_time" not in st.session_state:
+    st.session_state.last_activity_time = time.time()
+
+# Update the last activity time on any user interaction (e.g., button clicks, inputs)
+track_user_activity()
+
+# Background task that checks for inactivity every minute
+def inactivity_checker():
+    while True:
+        current_time = time.time()
+        # Check if more than 5 minutes (300 seconds) have passed since last activity
+        if current_time - st.session_state.last_activity_time > 300:
+            cleanup_images()
+            break
+        time.sleep(60)  # Check every minute for inactivity
+
+# Automatically call the inactivity checker without user interaction
+if "inactivity_checker_running" not in st.session_state:
+    st.session_state["inactivity_checker_running"] = True
+    inactivity_checker()
+    
 # Streamlit title and introduction
 st.title("Archived MesoAnalysis GIF Generator")
 st.write("Enter the parameters below to generate and download a GIF.")
@@ -25,8 +68,6 @@ parameter_options = {
         "ThetaE Advection": "thea",
         "2hr Pressure Change": "pchg"
     },
-
-    
     "Basic UA/Forcing Fields": {
         "850 mb": "850mb",
         "700 mb": "700mb",
@@ -197,3 +238,15 @@ if st.button("Generate GIF"):
             st.error("No GIF could be generated. Please check your inputs.")
     else:
         st.error("Please select a valid parameter.")
+
+def keep_alive():
+    # This will run in the background and refresh the app periodically
+    while True:
+        # Refresh the app every 25 minutes (Streamlit timeout period)
+        time.sleep(1500)  # 1500 seconds = 25 minutes
+        st.experimental_rerun()
+
+# Call the keep_alive function in the background
+if "keep_alive_running" not in st.session_state:
+    st.session_state["keep_alive_running"] = True
+    keep_alive()
